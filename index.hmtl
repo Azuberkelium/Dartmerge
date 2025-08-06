@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DartMerge</title>
+    <!-- Google Fonts: Inter for a clean look -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS CDN for basic utilities and responsive classes -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Base styles for the body */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c; /* Dark background for a modern feel */
+            color: #e2e8f0; /* Light text for contrast */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh; /* Full viewport height */
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+            overflow-y: auto; /* Allow scrolling if content is too tall */
+        }
+
+        /* Game container styling */
+        #game-container {
+            background-color: #2d3748; /* Slightly lighter dark background for the container */
+            border-radius: 15px; /* Rounded corners for the container */
+            padding: 25px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3); /* Soft shadow for depth */
+            width: 100%;
+            max-width: 600px; /* Max width for better desktop experience */
+            display: flex;
+            flex-direction: column;
+            gap: 20px; /* Space between sections */
+            border: 2px solid #4a5568; /* Subtle border */
+        }
+
+        /* Title styling */
+        h1 {
+            text-align: center;
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #63b3ed; /* A vibrant blue for the title */
+            text-shadow: 0 0 10px rgba(99, 179, 237, 0.5); /* Glowing text effect */
+            margin-bottom: 20px;
+        }
+
+        /* Styling for all number blocks (top, drop zone, grid) */
+        .number-block, .grid-cell-content {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 60px; /* Consistent size for blocks */
+            height: 60px;
+            border-radius: 10px; /* Rounded corners for blocks */
+            font-weight: 700;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: transform 0.1s ease-out, box-shadow 0.1s ease-out; /* Smooth transitions for hover/active states */
+            user-select: none; /* Prevent text selection */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2); /* Soft shadow */
+            border: 2px solid rgba(255, 255, 255, 0.1); /* Subtle white border */
+            color: #e2e8f0; /* Text color for numbers */
+        }
+
+        /* Hover and active states for clickable blocks */
+        .number-block:hover:not(.disabled) {
+            transform: translateY(-3px); /* Lift effect on hover */
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
+        }
+        .number-block:active:not(.disabled) {
+            transform: translateY(0); /* Press effect on click */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        .number-block.disabled {
+            opacity: 0.5; /* Dim disabled blocks */
+            cursor: not-allowed;
+        }
+
+        /* Specific block colors based on value */
+        .block-2 { background-color: #63b3ed; } /* Light Blue */
+        .block-4 { background-color: #48bb78; } /* Green */
+        .block-8 { background-color: #ecc94b; } /* Yellow */
+        .block-16 { background-color: #ed8936; } /* Orange */
+        .block-32 { background-color: #f56565; } /* Red */
+        .block-64 { background-color: #9f7aea; } /* Purple */
+        .block-128 { background-color: #ed64a6; } /* Pink */
+        .block-256 { background-color: #4fd1c5; } /* Teal */
+        .block-512 { background-color: #a0522d; } /* Sienna Brown */
+        .block-1024 { background-color: #2b6cb0; } /* Dark Blue */
+        .block-2048 { background-color: #d69e2e; } /* Gold */
+        .block-miss { background-color: #a0aec0; } /* Gray for 'Miss' */
+        .block-bomb { background-color: #e53e3e; } /* Red for 'Bomb' */
+        .block-block-swap { background-color: #805ad5; } /* Violet for 'Block Swap' */
+        .block-hammer { background-color: #718096; } /* Dark Gray for 'Hammer' */
+        .block-empty { background-color: #4a5568; } /* Background for empty grid cells */
+
+        /* Top numbers section */
+        #top-numbers {
+            display: flex;
+            flex-wrap: wrap; /* Allow blocks to wrap to the next line */
+            justify-content: center;
+            gap: 10px;
+            padding: 15px;
+            background-color: #2d3748;
+            border-radius: 10px;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1); /* Inner shadow */
+        }
+        #top-numbers .number-block {
+            width: 50px; /* Smaller size for top numbers */
+            height: 50px;
+            font-size: 1rem;
+        }
+
+        /* Drop zone container */
+        #drop-zone-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            background-color: #2d3748;
+            border-radius: 10px;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        #drop-zone {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            min-height: 70px; /* Ensure space even when empty */
+            align-items: center;
+            width: 100%;
+        }
+        #drop-zone .number-block {
+            width: 60px; /* Standard size for drop zone blocks */
+            height: 60px;
+            font-size: 1.2rem;
+            border: 2px dashed #90cdf4; /* Dashed border for visual distinction */
+        }
+        #drop-zone .number-block.selected-for-drop {
+            border: 2px solid #fc8181; /* Red border when selected for dropping */
+            box-shadow: 0 0 15px rgba(252, 129, 129, 0.7); /* Red glow when selected */
+        }
+
+        /* Action buttons (Undo, Restart) */
+        .action-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            width: 100%;
+        }
+        .action-buttons button {
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out; /* Smooth transitions */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            border: none;
+            color: #e2e8f0;
+            background-image: linear-gradient(to right, #4299e1, #63b3ed); /* Blue gradient */
+        }
+        .action-buttons button:hover:not(:disabled) {
+            transform: translateY(-2px); /* Lift effect on hover */
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+            background-image: linear-gradient(to right, #3182ce, #4299e1); /* Darker gradient on hover */
+        }
+        .action-buttons button:active:not(:disabled) {
+            transform: translateY(0); /* Press effect on click */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        .action-buttons button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            background-image: linear-gradient(to right, #a0aec0, #cbd5e0); /* Grayed out when disabled */
+        }
+
+        /* Game grid styling */
+        #game-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr); /* 5 columns, equal width */
+            grid-template-rows: repeat(5, 1fr); /* 5 rows, equal height */
+            gap: 5px; /* Space between grid cells */
+            width: 100%;
+            aspect-ratio: 1 / 1; /* Make the grid perfectly square */
+            background-color: #1a202c;
+            border-radius: 10px;
+            padding: 10px;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.3); /* Inner shadow for depth */
+            border: 2px solid #4a5568;
+        }
+        .grid-cell {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #4a5568; /* Background for empty cells */
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden; /* Important for glowing effect to stay within bounds */
+            transition: background-color 0.2s ease-in-out;
+        }
+        .grid-cell.column-active {
+            box-shadow: 0 0 0 3px #90cdf4, inset 0 0 0 3px #90cdf4; /* Highlight active column for dropping */
+            cursor: pointer;
+        }
+        .grid-cell.column-active:hover {
+            background-color: #5a667a; /* Slightly lighter on hover when active */
+        }
+        /* New style for selected swap blocks */
+        .grid-cell.selected-for-swap {
+            box-shadow: 0 0 0 4px #805ad5, inset 0 0 0 4px #805ad5; /* Violet glow for selected swap block */
+            background-color: #6b46c1; /* Slightly darker violet */
+        }
+        .grid-cell.selected-for-swap:hover {
+            background-color: #744edc; /* Lighter violet on hover */
+        }
+        /* New style for selected hammer target */
+        .grid-cell.selected-for-hammer {
+            box-shadow: 0 0 0 4px #e53e3e, inset 0 0 0 4px #e53e3e; /* Red glow for hammer target */
+            background-color: #c53030; /* Slightly darker red */
+        }
+        .grid-cell.selected-for-hammer:hover {
+            background-color: #d64545; /* Lighter red on hover */
+        }
+
+
+        /* Keyframe animation for the glowing effect */
+        @keyframes glow {
+            0% { box-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 15px #63b3ed, 0 0 20px #63b3ed, 0 0 25px #63b3ed, 0 0 30px #63b3ed, 0 0 35px #63b3ed; }
+            100% { box-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #63b3ed, 0 0 40px #63b3ed, 0 0 50px #63b3ed, 0 0 60px #63b3ed, 0 0 70px #63b3ed; }
+        }
+        /* Apply glowing animation to the highest value block */
+        .grid-cell-content.glowing {
+            animation: glow 1.5s infinite alternate; /* Continuous, alternating glow */
+        }
+
+        /* Game info section (Score, Highest Value) */
+        #game-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #90cdf4; /* Blue text for info */
+        }
+
+        /* Game Over Modal */
+        #game-over-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7); /* Semi-transparent black overlay */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000; /* Ensure it's on top */
+            visibility: hidden; /* Hidden by default */
+            opacity: 0;
+            transition: visibility 0s, opacity 0.3s ease-in-out; /* Smooth fade in/out */
+        }
+        #game-over-modal.show {
+            visibility: visible;
+            opacity: 1;
+        }
+        #game-over-content {
+            background-color: #2d3748;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            color: #e2e8f0;
+            max-width: 90%; /* Responsive width */
+        }
+        #game-over-content h2 {
+            font-size: 2.5rem;
+            color: #fc8181; /* Red for "Game Over" */
+            margin-bottom: 20px;
+        }
+        #game-over-content p {
+            font-size: 1.5rem;
+            margin-bottom: 25px;
+        }
+        #game-over-content button {
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 1.2rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            background-image: linear-gradient(to right, #48bb78, #68d391); /* Green gradient for restart */
+            color: #e2e8f0;
+            border: none;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        }
+        #game-over-content button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+            background-image: linear-gradient(to right, #38a169, #48bb78); /* Darker green on hover */
+        }
+
+        /* Info Message Box (replaces alert()) */
+        #info-message {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #4299e1; /* Blue background */
+            color: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            z-index: 1001; /* Above modal */
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+            text-align: center;
+        }
+
+        /* Responsive adjustments for smaller screens */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+            .number-block, .grid-cell-content {
+                width: 50px;
+                height: 50px;
+                font-size: 1rem;
+            }
+            #top-numbers .number-block {
+                width: 45px;
+                height: 45px;
+                font-size: 0.9rem;
+            }
+            #drop-zone .number-block {
+                width: 55px;
+                height: 55px;
+                font-size: 1.1rem;
+            }
+            .action-buttons button {
+                padding: 10px 20px;
+                font-size: 1rem;
+            }
+            #game-info {
+                font-size: 1rem;
+            }
+            #game-over-content h2 {
+                font-size: 2rem;
+            }
+            #game-over-content p {
+                font-size: 1.2rem;
+            }
+            #game-over-content button {
+                padding: 12px 25px;
+                font-size: 1.1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <h1>DartMerge</h1>
+
+        <!-- Section for the clickable numbers at the top -->
+        <div id="top-numbers">
+            <!-- Number blocks will be dynamically rendered here by JavaScript -->
+        </div>
+
+        <!-- Section for the drop zone and undo button -->
+        <div id="drop-zone-container">
+            <div id="drop-zone">
+                <!-- Numbers dropped from the top will appear here -->
+            </div>
+            <div class="action-buttons">
+                <button id="undo-button">Undo (3)</button>
+                <button id="reset-game-button">Reset Game</button>
+            </div>
+        </div>
+
+        <!-- The 5x5 game grid -->
+        <div id="game-grid">
+            <!-- Grid cells and their contents will be dynamically rendered here by JavaScript -->
+        </div>
+
+        <!-- Game information: Score and Highest Value -->
+        <div id="game-info">
+            <span>Score: <span id="score">0</span></span>
+            <span>Highest: <span id="highest-value">0</span></span>
+        </div>
+    </div>
+
+    <!-- Game Over Modal (hidden by default) -->
+    <div id="game-over-modal">
+        <div id="game-over-content">
+            <h2>Game Over!</h2>
+            <p>Final Score: <span id="final-score">0</span></p>
+            <p>Highest Block: <span id="modal-highest-value">0</span></p>
+            <button id="restart-button">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        // Define the initial set of numbers available at the top, including 'Miss', 'Bomb', 'Block Swap', and 'Hammer'
+        const TOP_NUMBERS_VALUES = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, "Miss", "Bomb", "Block Swap", "Hammer"];
+        const MAX_DROP_ZONE_SIZE = 3; // Maximum numbers allowed in the drop zone
+        const MAX_UNDO_COUNT = 3;     // Maximum times the undo button can be used
+        const GRID_SIZE = 5;          // The grid dimensions (5x5)
+
+        // Mapping values to their corresponding CSS color classes
+        const blockColors = {
+            2: 'block-2',
+            4: 'block-4',
+            8: 'block-8',
+            16: 'block-16',
+            32: 'block-32',
+            64: 'block-64',
+            128: 'block-128',
+            256: 'block-256',
+            512: 'block-512',
+            1024: 'block-1024',
+            2048: 'block-2048',
+            'Miss': 'block-miss',
+            'Bomb': 'block-bomb',
+            'Block Swap': 'block-block-swap',
+            'Hammer': 'block-hammer', // New color for Hammer block
+            0: 'block-empty' // Class for empty grid cells
+        };
+
+        // Game state variables, initialized to their default values
+        let gameGrid = []; // Represents the 5x5 game board, 0 indicates an empty cell
+        let dropZoneNumbers = []; // Array to hold numbers currently in the drop zone
+        let undoCount = MAX_UNDO_COUNT; // Tracks remaining undo uses
+        let score = 0; // Current game score
+        let highestValue = 0; // Highest number currently in the grid
+        let selectedDropZoneIndex = -1; // Index of the number selected in drop zone for placement (-1 means none)
+        let isDroppingMode = false; // Flag to indicate if a number is selected for dropping into the grid
+        let firstSwapBlock = null; // Stores [row, col] of the first block selected for Block Swap
+        let undoHistory = []; // Stores previous game states for the undo functionality
+
+        // Get references to key DOM elements
+        const topNumbersDiv = document.getElementById('top-numbers');
+        const dropZoneDiv = document.getElementById('drop-zone');
+        const undoButton = document.getElementById('undo-button');
+        const resetGameButton = document.getElementById('reset-game-button');
+        const gameGridDiv = document.getElementById('game-grid');
+        const scoreSpan = document.getElementById('score');
+        const highestValueSpan = document.getElementById('highest-value');
+        const gameOverModal = document.getElementById('game-over-modal');
+        const finalScoreSpan = document.getElementById('final-score');
+        const modalHighestValueSpan = document.getElementById('modal-highest-value');
+        const restartButton = document.getElementById('restart-button');
+
+        /**
+         * Returns the CSS class name for a given number value or special block.
+         * @param {number|string} value - The block value (e.g., 2, 'Miss', 'Bomb', 'Block Swap', 'Hammer').
+         * @returns {string} The corresponding CSS class name.
+         */
+        function getBlockColorClass(value) {
+            return blockColors[value] || 'block-empty';
+        }
+
+        /**
+         * Updates all dynamic parts of the UI (top numbers, drop zone, grid, score, highest value, undo button state).
+         */
+        function updateUI() {
+            renderTopNumbers();
+            renderDropZone();
+            renderGrid();
+            scoreSpan.textContent = score;
+            highestValueSpan.textContent = highestValue;
+            undoButton.textContent = `Undo (${undoCount})`;
+            undoButton.disabled = undoCount === 0 || undoHistory.length === 0;
+        }
+
+        /**
+         * Renders the clickable number blocks in the top section.
+         */
+        function renderTopNumbers() {
+            topNumbersDiv.innerHTML = ''; // Clear existing blocks
+            TOP_NUMBERS_VALUES.forEach(value => {
+                const block = document.createElement('div');
+                block.classList.add('number-block', getBlockColorClass(value));
+                block.textContent = value;
+                block.dataset.value = value;
+                block.addEventListener('click', () => handleTopNumberClick(value));
+                topNumbersDiv.appendChild(block);
+            });
+        }
+
+        /**
+         * Renders the numbers currently in the drop zone.
+         */
+        function renderDropZone() {
+            dropZoneDiv.innerHTML = ''; // Clear existing blocks
+            dropZoneNumbers.forEach((value, index) => {
+                const block = document.createElement('div');
+                block.classList.add('number-block', getBlockColorClass(value));
+                if (index === selectedDropZoneIndex) {
+                    block.classList.add('selected-for-drop');
+                }
+                block.textContent = value;
+                block.dataset.value = value;
+                block.dataset.index = index;
+                block.addEventListener('click', () => handleDropZoneClick(index));
+                dropZoneDiv.appendChild(block);
+            });
+        }
+
+        /**
+         * Renders the 5x5 game grid, including numbers and empty cells.
+         * Highlights columns if in dropping mode, or individual cells if in Block Swap/Hammer mode.
+         */
+        function renderGrid() {
+            gameGridDiv.innerHTML = ''; // Clear existing grid cells
+            const selectedDropZoneValue = dropZoneNumbers[selectedDropZoneIndex];
+
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('grid-cell');
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+
+                    if (isDroppingMode) {
+                        if (selectedDropZoneValue === "Block Swap") {
+                            cell.classList.add('column-active'); // Reusing column-active for general clickable state
+                            if (firstSwapBlock && firstSwapBlock[0] === r && firstSwapBlock[1] === c) {
+                                cell.classList.add('selected-for-swap'); // Highlight the first selected block
+                            }
+                            cell.addEventListener('click', () => handleGridCellClickForSwap(r, c));
+                        } else if (selectedDropZoneValue === "Hammer") {
+                            cell.classList.add('column-active'); // Highlight all cells for hammer target
+                            cell.classList.add('selected-for-hammer'); // Specific glow for hammer
+                            cell.addEventListener('click', () => handleGridCellClickForHammer(r, c));
+                        }
+                        else {
+                            // For regular numbers or Bomb, only columns are clickable
+                            cell.classList.add('column-active');
+                            cell.addEventListener('click', () => handleGridColumnClick(c));
+                        }
+                    }
+
+                    const value = gameGrid[r][c];
+                    if (value !== 0) { // If the cell is not empty
+                        const content = document.createElement('div');
+                        content.classList.add('grid-cell-content', 'number-block', getBlockColorClass(value));
+                        content.textContent = value;
+                        if (value === highestValue && highestValue !== 0) {
+                            content.classList.add('glowing');
+                        }
+                        cell.appendChild(content);
+                    }
+                    gameGridDiv.appendChild(cell);
+                }
+            }
+        }
+
+        /**
+         * Calculates the total score by summing all numbers in the grid.
+         */
+        function calculateScore() {
+            let currentScore = 0;
+            gameGrid.forEach(row => {
+                row.forEach(value => {
+                    if (typeof value === 'number') { // Only sum actual numbers
+                        currentScore += value;
+                    }
+                });
+            });
+            score = currentScore;
+        }
+
+        /**
+         * Finds the highest value number currently present in the grid.
+         */
+        function getHighestValue() {
+            let maxVal = 0;
+            gameGrid.forEach(row => {
+                row.forEach(value => {
+                    if (typeof value === 'number' && value > maxVal) {
+                        maxVal = value;
+                    }
+                });
+            });
+            highestValue = maxVal;
+        }
+
+        /**
+         * Handles the click event on a number block in the top section.
+         * Replicates the number into the drop zone if space is available.
+         * @param {number|string} value - The value of the clicked block.
+         */
+        function handleTopNumberClick(value) {
+            if (dropZoneNumbers.length < MAX_DROP_ZONE_SIZE) {
+                // Save the current game state before adding to drop zone
+                undoHistory.push({
+                    grid: JSON.parse(JSON.stringify(gameGrid)),
+                    dropZone: [...dropZoneNumbers],
+                    undoCount: undoCount,
+                    score: score,
+                    highestValue: highestValue,
+                    firstSwapBlock: firstSwapBlock // Save firstSwapBlock state
+                });
+
+                dropZoneNumbers.push(value); // Add the value to the drop zone (replication)
+                updateUI(); // Refresh the UI to reflect changes
+            } else {
+                showInfoMessage("Drop zone is full! Place a number in the grid first.");
+            }
+        }
+
+        /**
+         * Handles the click event on the undo button.
+         * Reverts the game state to the previous one if undos are available.
+         */
+        function handleUndoClick() {
+            if (undoCount > 0 && undoHistory.length > 0) {
+                const prevState = undoHistory.pop(); // Get the last saved state
+                // Restore game state from history
+                gameGrid = prevState.grid;
+                dropZoneNumbers = prevState.dropZone;
+                undoCount = prevState.undoCount - 1; // Decrement undo count
+                score = prevState.score;
+                highestValue = prevState.highestValue;
+                firstSwapBlock = prevState.firstSwapBlock; // Restore firstSwapBlock
+                selectedDropZoneIndex = -1; // Clear any active selection
+                isDroppingMode = false; // Exit dropping mode
+                updateUI(); // Refresh the UI
+            }
+        }
+
+        /**
+         * Handles the click event on a number in the drop zone.
+         * Toggles the selection of a number for placement into the grid or for a special action.
+         * @param {number} index - The index of the clicked number in the dropZoneNumbers array.
+         */
+        function handleDropZoneClick(index) {
+            if (selectedDropZoneIndex === index) {
+                // If the same number is clicked again, deselect it
+                selectedDropZoneIndex = -1;
+                isDroppingMode = false;
+                firstSwapBlock = null; // Clear firstSwapBlock on deselect
+            } else {
+                // Select the number and enter dropping mode
+                selectedDropZoneIndex = index;
+                isDroppingMode = true;
+                firstSwapBlock = null; // Clear firstSwapBlock on new selection
+                const selectedValue = dropZoneNumbers[selectedDropZoneIndex];
+                if (selectedValue === "Block Swap") {
+                    showInfoMessage("Select the first block to swap.");
+                } else if (selectedValue === "Hammer") {
+                    showInfoMessage("Select a block in the grid to remove.");
+                }
+            }
+            updateUI(); // Refresh UI to show selection/deselection
+        }
+
+        /**
+         * Handles the click event on a grid column when in dropping mode (for numbers/bomb).
+         * Places the selected number into the lowest available space in that column.
+         * @param {number} col - The column index where the number should be placed.
+         */
+        function handleGridColumnClick(col) {
+            // This function is only called if selectedDropZoneValue is NOT "Block Swap" or "Hammer"
+            if (!isDroppingMode || selectedDropZoneIndex === -1) return;
+
+            const valueToPlace = dropZoneNumbers[selectedDropZoneIndex];
+            if (valueToPlace === undefined) return;
+
+            // Save state BEFORE any action that modifies the grid or drop zone
+            undoHistory.push({
+                grid: JSON.parse(JSON.stringify(gameGrid)),
+                dropZone: [...dropZoneNumbers],
+                undoCount: undoCount,
+                score: score,
+                highestValue: highestValue,
+                firstSwapBlock: firstSwapBlock
+            });
+
+            // --- LOGIC FOR 'MISS' BLOCK ---
+            if (valueToPlace === "Miss") {
+                dropZoneNumbers.splice(selectedDropZoneIndex, 1);
+                selectedDropZoneIndex = -1;
+                isDroppingMode = false;
+                showInfoMessage("Miss block disappeared!");
+                updateUI();
+                return;
+            }
+            // --- END LOGIC FOR 'MISS' BLOCK ---
+
+            // --- LOGIC FOR 'BOMB' BLOCK ---
+            if (valueToPlace === "Bomb") {
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    gameGrid[r][col] = 0; // Clear each cell in the column
+                }
+                dropZoneNumbers.splice(selectedDropZoneIndex, 1); // Remove bomb from drop zone
+                selectedDropZoneIndex = -1;
+                isDroppingMode = false;
+                showInfoMessage(`Column ${col + 1} cleared by Bomb!`);
+                processGridChanges(); // Recalculate score and highest value
+                updateUI();
+                checkGameOver();
+                return;
+            }
+            // --- END LOGIC FOR 'BOMB' BLOCK ---
+
+            let targetRow = -1;
+            // Find the lowest available (empty) space in the selected column
+            for (let r = GRID_SIZE - 1; r >= 0; r--) {
+                if (gameGrid[r][col] === 0) {
+                    targetRow = r;
+                    break;
+                }
+            }
+
+            if (targetRow !== -1) {
+                gameGrid[targetRow][col] = valueToPlace;
+                dropZoneNumbers.splice(selectedDropZoneIndex, 1);
+
+                selectedDropZoneIndex = -1;
+                isDroppingMode = false;
+
+                processGridChanges();
+                updateUI();
+                checkGameOver();
+            } else {
+                // Game over condition: Column is full
+                showGameOverModal();
+            }
+        }
+
+        /**
+         * Handles clicks on grid cells specifically when "Block Swap" is active.
+         * @param {number} r - The row index of the clicked cell.
+         * @param {number} c - The column index of the clicked cell.
+         */
+        function handleGridCellClickForSwap(r, c) {
+            if (!isDroppingMode || dropZoneNumbers[selectedDropZoneIndex] !== "Block Swap") return;
+
+            if (!firstSwapBlock) {
+                // First block selected for swap
+                firstSwapBlock = [r, c];
+                showInfoMessage("Select the second block to swap.");
+            } else {
+                // Second block selected for swap
+                const secondSwapBlock = [r, c];
+
+                // Prevent swapping a block with itself
+                if (firstSwapBlock[0] === secondSwapBlock[0] && firstSwapBlock[1] === secondSwapBlock[1]) {
+                    showInfoMessage("Cannot swap a block with itself. Select a different block.");
+                    firstSwapBlock = null; // Reset first selection
+                    updateUI();
+                    return;
+                }
+
+                // Save state BEFORE the swap action
+                undoHistory.push({
+                    grid: JSON.parse(JSON.stringify(gameGrid)),
+                    dropZone: [...dropZoneNumbers],
+                    undoCount: undoCount,
+                    score: score,
+                    highestValue: highestValue,
+                    firstSwapBlock: firstSwapBlock // Save the state of firstSwapBlock too
+                });
+
+                // Perform the swap
+                const temp = gameGrid[firstSwapBlock[0]][firstSwapBlock[1]];
+                gameGrid[firstSwapBlock[0]][firstSwapBlock[1]] = gameGrid[secondSwapBlock[0]][secondSwapBlock[1]];
+                gameGrid[secondSwapBlock[0]][secondSwapBlock[1]] = temp;
+
+                // Remove "Block Swap" from drop zone after use
+                dropZoneNumbers.splice(selectedDropZoneIndex, 1);
+
+                // Reset swap state
+                selectedDropZoneIndex = -1;
+                isDroppingMode = false;
+                firstSwapBlock = null;
+
+                showInfoMessage("Blocks swapped!");
+                processGridChanges(); // Check for new merges and falling blocks after swap
+                updateUI();
+                checkGameOver();
+            }
+            updateUI(); // Always update UI after a click in swap mode
+        }
+
+        /**
+         * Handles clicks on grid cells specifically when "Hammer" is active.
+         * Removes the selected block from the grid.
+         * @param {number} r - The row index of the clicked cell.
+         * @param {number} c - The column index of the clicked cell.
+         */
+        function handleGridCellClickForHammer(r, c) {
+            if (!isDroppingMode || dropZoneNumbers[selectedDropZoneIndex] !== "Hammer") return;
+
+            // Save state BEFORE the hammer action
+            undoHistory.push({
+                grid: JSON.parse(JSON.stringify(gameGrid)),
+                dropZone: [...dropZoneNumbers],
+                undoCount: undoCount,
+                score: score,
+                highestValue: highestValue,
+                firstSwapBlock: firstSwapBlock // Ensure this is saved even if not used by hammer
+            });
+
+            // Remove the block
+            gameGrid[r][c] = 0;
+
+            // Remove "Hammer" from drop zone after use
+            dropZoneNumbers.splice(selectedDropZoneIndex, 1);
+
+            // Reset hammer state
+            selectedDropZoneIndex = -1;
+            isDroppingMode = false;
+
+            showInfoMessage("Block removed by Hammer!");
+            processGridChanges(); // Check for falling blocks after removal
+            updateUI();
+            checkGameOver();
+        }
+
+
+        /**
+         * Orchestrates the merging and dropping of blocks after a number is placed or swapped.
+         * This function repeatedly checks for merges until no more merges can occur,
+         * then makes all blocks fall.
+         */
+        function processGridChanges() {
+            let mergesOccurred;
+            do {
+                mergesOccurred = false; // Assume no merges occurred in this pass
+                // Iterate through the entire grid to find and perform merges
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    for (let c = 0; c < GRID_SIZE; c++) {
+                        const currentValue = gameGrid[r][c];
+                        // Skip empty cells or special blocks for merging
+                        if (currentValue === 0 || currentValue === 'Miss' || currentValue === 'Bomb' || currentValue === 'Block Swap' || currentValue === 'Hammer') continue;
+
+                        // Define directions to check for adjacent blocks (Up, Down, Left, Right)
+                        const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+
+                        for (const [dr, dc] of directions) {
+                            const nRow = r + dr;
+                            const nCol = c + dc;
+
+                            // Check if the neighbor is within grid bounds and has the same value
+                            if (nRow >= 0 && nRow < GRID_SIZE && nCol >= 0 && nCol < GRID_SIZE &&
+                                gameGrid[nRow][nCol] === currentValue) {
+
+                                gameGrid[r][c] = currentValue * 2; // Double the value of the current block
+                                gameGrid[nRow][nCol] = 0; // Clear the merged block (it's now part of the doubled block)
+                                mergesOccurred = true; // A merge happened in this pass
+
+                                // Break from inner loop to restart the do-while loop.
+                                // This is crucial for cascading merges: if a block merges,
+                                // its new value might immediately merge with another neighbor.
+                                // By restarting the loop, we ensure the newly formed block is re-evaluated.
+                                break;
+                            }
+                        }
+                        if (mergesOccurred) break; // If a merge occurred, break outer loop and restart do-while
+                    }
+                    if (mergesOccurred) break;
+                }
+            } while (mergesOccurred); // Continue looping as long as merges are still occurring
+
+            // After all possible merges are completed, make any floating blocks fall down
+            dropAllBlocks();
+
+            // Update score and highest value based on the new grid state
+            calculateScore();
+            getHighestValue();
+        }
+
+        /**
+         * Makes all blocks in the grid fall to the lowest available space in their respective columns.
+         */
+        function dropAllBlocks() {
+            for (let c = 0; c < GRID_SIZE; c++) { // Iterate through each column
+                let emptyRow = GRID_SIZE - 1; // Start from the bottom-most row
+                for (let r = GRID_SIZE - 1; r >= 0; r--) { // Iterate upwards from the bottom
+                    if (gameGrid[r][c] !== 0) { // If there's a block in the current cell
+                        if (r !== emptyRow) { // If it's not already at its lowest possible position
+                            gameGrid[emptyRow][c] = gameGrid[r][c]; // Move the block down
+                            gameGrid[r][c] = 0; // Clear the original position
+                        }
+                        emptyRow--; // Move up to find the next empty spot for the next block
+                    }
+                }
+            }
+        }
+
+        /**
+         * Checks if the game is over. The game is over when the grid is completely full.
+         */
+        function checkGameOver() {
+            let isGridFull = true;
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    if (gameGrid[r][c] === 0) { // If any cell is empty, the grid is not full
+                        isGridFull = false;
+                        break;
+                    }
+                }
+                if (!isGridFull) break;
+            }
+
+            if (isGridFull) {
+                showGameOverModal(); // Display the game over modal
+            }
+        }
+
+        /**
+         * Displays the game over modal with the final score and highest block.
+         */
+        function showGameOverModal() {
+            finalScoreSpan.textContent = score; // Update final score in the modal
+            modalHighestValueSpan.textContent = highestValue; // Update highest value in the modal
+            gameOverModal.classList.add('show'); // Add 'show' class to make it visible
+        }
+
+        /**
+         * Hides the game over modal.
+         */
+        function hideGameOverModal() {
+            gameOverModal.classList.remove('show'); // Remove 'show' class to hide it
+        }
+
+        /**
+         * Resets the game to its initial state, clearing the grid, drop zone, and scores.
+         */
+        function resetGame() {
+            // Initialize grid with all empty cells (0)
+            gameGrid = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(0));
+            dropZoneNumbers = []; // Clear drop zone
+            undoCount = MAX_UNDO_COUNT; // Reset undo count
+            score = 0; // Reset score
+            highestValue = 0; // Reset highest value
+            selectedDropZoneIndex = -1; // Deselect any drop zone item
+            isDroppingMode = false; // Exit dropping mode
+            firstSwapBlock = null; // Reset first swap block selection
+            undoHistory = []; // Clear undo history
+            hideGameOverModal(); // Hide the game over modal if it's visible
+            updateUI(); // Refresh the UI to reflect the reset state
+        }
+
+        /**
+         * Displays a temporary information message to the user (replaces alert()).
+         * @param {string} message - The message to display.
+         */
+        function showInfoMessage(message) {
+            // Remove any existing message to prevent multiple messages overlapping
+            const existingMessage = document.getElementById('info-message');
+            if (existingMessage) {
+                existingMessage.remove();
+            }
+
+            const infoDiv = document.createElement('div');
+            infoDiv.id = 'info-message';
+            infoDiv.textContent = message;
+            document.body.appendChild(infoDiv);
+
+            // Trigger fade-in animation
+            setTimeout(() => {
+                infoDiv.style.opacity = 1;
+            }, 10);
+
+            // Trigger fade-out and removal after 3 seconds
+            setTimeout(() => {
+                infoDiv.style.opacity = 0;
+                infoDiv.addEventListener('transitionend', () => infoDiv.remove());
+            }, 3000);
+        }
+
+        // Initialize the game and set up event listeners when the window has fully loaded
+        window.onload = function () {
+            resetGame(); // Start a new game
+            undoButton.addEventListener('click', handleUndoClick); // Attach undo button listener
+            resetGameButton.addEventListener('click', resetGame); // Attach new Reset Game button listener
+            restartButton.addEventListener('click', resetGame); // Attach restart button listener
+        };
+    </script>
+</body>
+</html>
